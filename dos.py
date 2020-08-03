@@ -102,7 +102,9 @@ def simulate_particle(history):
                         dof = get_isotropic()
                         # Update probability of moving to state and derivative thereof
                         transition_prob = transmit_prob * reaction_xs / total_xs / (4. * np.pi)
-                        d_transition_prob = - transmit_prob * distance * reaction_xs / total_xs
+                        d_transition_prob = (
+                            - transmit_prob * distance * reaction_xs / total_xs
+                            / (4. * np.pi))
                         d_k = transition_prob * d_k + k * d_transition_prob
                         k = k * transition_prob
                         break
