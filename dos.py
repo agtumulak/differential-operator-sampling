@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Prototype of the differential operator sampling method."""
-import pprint
 import time
 import multiprocessing as mp
 import numpy as np
