@@ -3,19 +3,16 @@
 import time
 import multiprocessing as mp
 import numpy as np
-np.set_printoptions(formatter={'float': lambda x: "{0:0.3f}".format(x)})
+import pandas as pd
 
 
 # Minimal data set required
-groups = range(1, 2+1)
+groups = range(1, 1+1)
 adjacent_cell = {'inner': 'outer', 'outer': 'inner'}
 xs = {
     'inner': {
         1: {
-            'scatter': {1: 0.0, 2: 0.0},
-            'capture': 1.0,},
-        2: {
-            'scatter': {1: 0.0, 2: 0.0},
+            'scatter': {1: 1.0},
             'capture': 1.0,},},}
 rxn_probs = {}
 xs_totals = {}
