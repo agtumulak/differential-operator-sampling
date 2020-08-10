@@ -53,9 +53,9 @@ def distance_to_sphere(pos, dof, radius):
 
 def simulate_particle(history):
     """Simulate the particle history."""
-    # Set up estimators (leakage)
+    # Set up estimators (capture)
     estimators = {
-        g: {'leak': 0, 'leak sqr': 0, 'd_leak': 0, 'd_leak sqr': 0}
+        g: {'capture': 0, 'capture sqr': 0, 'd_capture': 0, 'd_capture sqr': 0}
         for g in groups}
     # Run simulation
     np.random.seed(history)
@@ -105,20 +105,31 @@ def simulate_particle(history):
                         k = k * transition_prob
                         break
                     if reaction == 'capture':
+                        # Score estimators
+                        estimators[group]['capture'] += 1
+                        estimators[group]['capture sqr'] += 1
+                        # Update probability of moving to state and derivative thereof
+                        transition_prob = transmit_prob * reaction_xs / total_xs
+                        d_transition_prob = transmit_prob * (1. - reaction_xs * distance) / total_xs
+                        d_k = transition_prob * d_k + k * d_transition_prob
+                        k = k * transition_prob
+                        dos_score = d_k / k
+                        estimators[group]['d_capture'] += dos_score
+                        estimators[group]['d_capture sqr'] += dos_score * dos_score
                         return estimators
                     raise RuntimeError
         elif min_event == 'cross_surf_1':
-            # Score estimators
-            estimators[group]['leak'] += 1
-            estimators[group]['leak sqr'] += 1
-            # Update probability of moving to state and derivative thereof
-            transition_prob = transmit_prob / total_xs
-            d_transition_prob = - transmit_prob * distance / total_xs
-            d_k = transition_prob * d_k + k * d_transition_prob
-            k = k * transition_prob
-            dos_score = d_k / k
-            estimators[group]['d_leak'] += dos_score
-            estimators[group]['d_leak sqr'] += dos_score * dos_score
+            # # Score estimators
+            # estimators[group]['leak'] += 1
+            # estimators[group]['leak sqr'] += 1
+            # # Update probability of moving to state and derivative thereof
+            # transition_prob = transmit_prob / total_xs
+            # d_transition_prob = - transmit_prob * distance / total_xs
+            # d_k = transition_prob * d_k + k * d_transition_prob
+            # k = k * transition_prob
+            # dos_score = d_k / k
+            # estimators[group]['d_leak'] += dos_score
+            # estimators[group]['d_leak sqr'] += dos_score * dos_score
             # Update particle state
             cell = adjacent_cell[cell]
             cell = 'void'
@@ -127,37 +138,39 @@ def simulate_particle(history):
             raise RuntimeError
 
 
-if __name__ == '__main__':
-    simulate_particle(1)
-    # Run RUNS
-    RUNS = 10000000
+def run_histories(runs, procs):
+    """Runs runs runs on procs processes."""
     tick = time.perf_counter()
-    PROCESSES = 8
-    print(f"Running {RUNS} histories on {PROCESSES} processes...")
+    print(f"Running {runs} histories on {procs} processes...")
     sums = {
-        group: {'leak': 0, 'leak sqr': 0, 'd_leak': 0, 'd_leak sqr': 0}
+        group: {'capture': 0, 'capture sqr': 0, 'd_capture': 0, 'd_capture sqr': 0}
         for group in groups}
     output = {}
-    with mp.Pool(processes=PROCESSES) as pool:
-        results = pool.imap(simulate_particle, range(RUNS), chunksize=1000)
+    with mp.Pool(processes=procs) as pool:
+        results = pool.imap(simulate_particle, range(runs), chunksize=1000)
         for result in results:
-            for g in groups:
-                sums[g]['leak'] += result[g]['leak']
-                sums[g]['leak sqr'] += result[g]['leak sqr']
-                sums[g]['d_leak'] += result[g]['d_leak']
-                sums[g]['d_leak sqr'] += result[g]['d_leak sqr']
-        for g in sums:
-            leak_mean = sums[g]['leak'] / RUNS
-            leak_mean_square = sums[g]['leak sqr'] / RUNS
-            d_leak_mean = sums[g]['d_leak'] / RUNS
-            d_leak_mean_square = sums[g]['d_leak sqr'] / RUNS
-            output[g] = {
-                'leak': leak_mean,
-                'leak stdev': np.sqrt((leak_mean_square - leak_mean ** 2) / RUNS),
-                'd_leak': d_leak_mean,
-                'd_leak stdev': np.sqrt((d_leak_mean_square - d_leak_mean ** 2) / RUNS),
+            for group in groups:
+                sums[group]['capture'] += result[group]['capture']
+                sums[group]['capture sqr'] += result[group]['capture sqr']
+                sums[group]['d_capture'] += result[group]['d_capture']
+                sums[group]['d_capture sqr'] += result[group]['d_capture sqr']
+        for group in sums:
+            capture_mean = sums[group]['capture'] / runs
+            capture_mean_square = sums[group]['capture sqr'] / runs
+            d_capture_mean = sums[group]['d_capture'] / runs
+            d_capture_mean_square = sums[group]['d_capture sqr'] / runs
+            output[group] = {
+                'capture': capture_mean,
+                'capture stdev': np.sqrt((capture_mean_square - capture_mean ** 2) / runs),
+                'd_capture': d_capture_mean,
+                'd_capture stdev': np.sqrt((d_capture_mean_square - d_capture_mean ** 2) / runs),
                 }
     tock = time.perf_counter()
-    parallel_time = tock - tick
-    pprint.pprint(output)
-    print(f"time elapsed: {parallel_time:0.4f}")
+    print(f"time elapsed: {tock-tick:0.4f}")
+    return output
+
+
+
+if __name__ == '__main__':
+    # Run RUNS
+    print(run_histories(10000000, 8))
